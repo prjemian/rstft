@@ -8,7 +8,6 @@
  *   Seeed Studio 2.8" TFT TouchShield v1.0
  */
 
-// TODO: DS3231
 // TODO: TFT
 
 /* 2.8" TFT TouchShield v1.0
@@ -31,9 +30,17 @@
  * https://www.digikey.sk/en/maker/projects/how-to-measure-temperature-with-an-ntc-thermistor/4a4b326095f144029df7f2eca589ca54
  */
 
-#define LDRPIN A0
-#define NTCPIN A1
-#define VCCPIN A2
+/* DS3231 RTC (real time clock)
+ * connected by I2C (SDA & SCL)
+ * requires library: RTClib
+ * https://github.com/adafruit/RTClib
+ */
+
+// Date and time functions using a DS3231 RTC connected via I2C and Wire lib
+#include "RTClib.h"
+
+#define LDRPIN A4
+#define NTCPIN A5
 #define LOOPDELAY 1000
 #define LIGHTING_THRESHOLD 600
 #define ADC_RESOLUTION (1/1024.)
@@ -41,40 +48,64 @@
 #define NTC_T_REF (25 + CELSIUS_OFFSET)
 #define NTC_R_REF 10000
 #define NTC_BETA 3950
+
+// temperature smoothing (0..1) higher means smoother
 #define SMOOTHING 0.7
 
 // actual measured resistance for ntc10k curcuit
 #define R_10K  9810
 
 double temperature;
+RTC_DS3231 rtc;
 
 
 void setup() {
-  Serial.begin(9600);
+  Serial.begin(115200);
   Serial.println("rstft");
 
   temperature = ntc10k(NTCPIN);
+
+  if (! rtc.begin()) {
+    Serial.println("Couldn't find RTC");
+    Serial.flush();
+    abort();
+  }
+  if (rtc.lostPower()) {
+    Serial.println("RTC lost power, let's set the time!");
+    rtc.adjust(DateTime(F(__DATE__), F(__TIME__)));
+    // rtc.adjust(DateTime(2014, 1, 21, 3, 0, 0));
+  }
 }
 
 
 void loop() {
   int ldr, ntc;
+  DateTime now = rtc.now();
 
   ldr = analogRead(LDRPIN);
   double sig;
 
-  Serial.print(" LDR=");
-  Serial.print(ldr);
-  if (ldr < LIGHTING_THRESHOLD) {
-    Serial.print(" (lights ON)");
-  } else {
-    Serial.print(" (lights OFF)");
-  }
-
   sig = ntc10k(NTCPIN);
   temperature = temperature*SMOOTHING + sig*(1-SMOOTHING);
-  Serial.print(" fahrenheit=");
+
+  Serial.print(now.unixtime());
+
+  if (ldr < LIGHTING_THRESHOLD) {
+    Serial.print(" (ON)");
+  } else {
+    Serial.print(" (OFF)");
+  }
+
+  Serial.print(" T=");
   Serial.print(temperature, 3);
+
+  Serial.print(" RTC_T=");
+  Serial.print(1.8*rtc.getTemperature()+32, 2);
+
+  Serial.print(" ");
+  Serial.print(now.timestamp(DateTime::TIMESTAMP_DATE));
+  Serial.print(" ");
+  Serial.print(now.timestamp(DateTime::TIMESTAMP_TIME));
 
   Serial.println("");
 
