@@ -42,7 +42,7 @@
 #define LDRPIN A4
 #define NTCPIN A5
 #define LOOPDELAY 1000
-#define LIGHTING_THRESHOLD 600
+#define LIGHTING_THRESHOLD 850
 #define ADC_RESOLUTION (1/1024.)
 #define CELSIUS_OFFSET 273.15
 #define NTC_T_REF (25 + CELSIUS_OFFSET)
@@ -53,7 +53,7 @@
 #define SMOOTHING 0.7
 
 // actual measured resistance for ntc10k curcuit
-#define R_10K  9810
+#define R_10K  9970
 
 double temperature;
 RTC_DS3231 rtc;
@@ -90,12 +90,16 @@ void loop() {
 
   Serial.print(now.unixtime());
 
+  Serial.print(" LDR=");
+  Serial.print(ldr);
   if (ldr < LIGHTING_THRESHOLD) {
     Serial.print(" (ON)");
   } else {
     Serial.print(" (OFF)");
   }
 
+  Serial.print(" NTC10K=");
+  Serial.print(analogRead(NTCPIN));
   Serial.print(" T=");
   Serial.print(temperature, 3);
 
@@ -129,7 +133,13 @@ double ntc10k(int pin) {
 
   adc = analogRead(pin);
   v = adc * ADC_RESOLUTION;
+  Serial.print(" V=");
+  Serial.print(v*5,3);
   r = R_10K*(1/v - 1);
+  // r = R_10K*(1/(1-v) - 1);
+  Serial.print(" R=");
+  Serial.print(r,0);
+  Serial.print("  ");
   kelvin = 1/(log(r/NTC_R_REF)/NTC_BETA + 1/NTC_T_REF);
   fahrenheit = 1.8*(kelvin - CELSIUS_OFFSET) + 32;
 
