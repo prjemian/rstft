@@ -9,8 +9,6 @@
  *   ADS1115 4-ch 16-bit A/D converter, I2C
  */
 
-// TODO: TFT
-
 /* 2.8" TFT TouchShield v1.0
  * www.seeedstudio.com
  * purchased on stock closeout from Radio Shack
@@ -39,6 +37,15 @@
  * https://github.com/adafruit/RTClib
  */
 
+/* ADS1115 4-channel 16-bit analog-digital converter using I2C communications
+ *  https://wolles-elektronikkiste.de/en/ads1115-a-d-converter-with-amplifier
+ */
+
+
+#include <stdint.h>
+#include <TouchScreen.h> 
+#include <TFT.h>
+
 // Date and time functions using a DS3231 RTC connected via I2C and Wire lib
 #include "RTClib.h"
 
@@ -48,7 +55,7 @@
 
 #define ADS1115_I2C_ADDRESS 0x48
 
-#define LOOPDELAY 1000
+#define LOOPDELAY 10
 #define LIGHTING_THRESHOLD 3.01
 #define CELSIUS_OFFSET 273.15
 #define NTC_T_REF (25 + CELSIUS_OFFSET)
@@ -97,6 +104,9 @@ void setup() {
   // ads1115.setConvRate(ADS1115_8_SPS); // the default
   ads1115.setMeasureMode(ADS1115_CONTINUOUS); //default is ADS1115_SINGLE
   // ALERT pin is not wired so ignore its configuration
+
+  Tft.init();  //init TFT library
+  Tft.setDisplayDirect(LEFT2RIGHT);
 }
 
 
@@ -142,6 +152,8 @@ void loop() {
 
   Serial.println("");
 
+  paintDisplay(temperature);
+
   delay(LOOPDELAY);
 }
 
@@ -180,4 +192,57 @@ float readADS115Channel(ADS1115_WE adc, ADS1115_MUX channel) {
   adc.setCompareChannels(channel);
   voltage = adc.getResult_V(); // alternative: getResult_mV for Millivolt
   return voltage;
+}
+
+unsigned int getBackgroundColor() {
+  unsigned int color = BLACK;
+
+  float ldr = readADS115Channel(ads1115, ADS1115_COMP_2_GND);
+  if (ldr < LIGHTING_THRESHOLD) {
+    color = GRAY1;
+  }
+  return (BLACK);
+}
+
+void writeText(char *text, unsigned int x, unsigned int y, unsigned int pt, unsigned int color, unsigned int bkg) {
+  int x_unit = 8;
+  int y_unit = 8;
+  Tft.fillRectangle(x, y-1, x_unit*strlen(text)*pt, y_unit*pt, bkg);
+  Tft.drawString(text, x, y, pt, color);
+}
+
+void paintDisplay(double temperature) {
+  char text[40];
+  int y = 60;
+  unsigned int bkgColor = getBackgroundColor();
+  DateTime now = rtc.now();
+  int hr = now.hour();
+  
+  if (hr > 12) hr -= 12;
+  if (hr == 0) hr = 12;
+  sprintf(text, "%02d:%02d", hr, now.minute());
+  writeText(text, 20, y, 4, WHITE, bkgColor);
+  sprintf(text, "%02d", now.second());
+  writeText(text, 190, y, 2, WHITE, bkgColor);
+  if (now.isPM()) {
+    strcpy(text, "PM");
+  } else {
+    strcpy(text, "AM");
+  }
+  writeText(text, 190, y+20, 2, WHITE, bkgColor);
+
+  y += 60;
+  sprintf(text, "%04d", now.year());
+  writeText(text, 80, y, 3, YELLOW, bkgColor);
+
+  y += 40;
+  sprintf(text, "%02d/%02d", now.month(), now.day());
+  writeText(text, 60, y, 3, YELLOW, bkgColor);
+
+  y += 60;
+//  sprintf(text, "%.2f", temperature);
+//  sprintf(text, "%.2lf", 65.0);
+  dtostrf(temperature, 5, 2, text);
+  writeText(text, 30, y, 4, YELLOW, bkgColor);
+  writeText("o", 180, y, 2, YELLOW, bkgColor);
 }
